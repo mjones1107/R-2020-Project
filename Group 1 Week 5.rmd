@@ -1,0 +1,109 @@
+---
+title: 'Week 5: Breast Cancer Variable Selection'
+author: 'Group 1: Maggie Dolan, Asheley Faris, Megan Jones, Tina Ladson, Daniel Ward'
+date: "2/16/2020"
+output: pdf_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Load Packages
+```{r Load Packages, message=FALSE, warning=FALSE}
+install.packages("caret",repos = "http://cran.us.r-project.org")
+pacman::p_load(pacman,janitor,readr,gmodels,tidyr,dplyr,ggthemes,gapminder,ggplot2,factoextra,e1071,cluster,kernlab,corrplot,corrgram,hrbrthemes,viridis,glmnet,rpart,rpart.plot,partykit) 
+```
+#Read in a data set
+
+```{r Read Data}
+#https://www.kaggle.com/uciml/breast-cancer-wisconsin-data
+cancer <- read_csv("C:\\Users\\mjone\\OneDrive\\Desktop\\MBA 8045\\Data\\cancer.csv") # Update to your file location
+cancer <- cancer %>%
+  clean_names()
+str(cancer) #569 Observations
+```
+
+
+##Prep Data For Regression 
+In order to do regression analysis we are converting Diagnostic to Binary Column
+
+```{r regression prep}
+cancer$diagnosis <- ifelse(cancer$diagnosis == "M", 1, 0)
+
+index_training <- sample(dim(cancer)[1], 100, replace = FALSE) # replace = false will prevent code from selecting same observation twice
+training_data  <- cancer[index_training, ]
+test_data      <- cancer[-index_training, ]#removes training observations
+
+```
+
+##Linear and Logistic Regression
+
+```{r Regression 1}
+mlr <- lm(radius_mean ~  texture_mean + perimeter_mean + area_mean + smoothness_mean + compactness_mean + concavity_mean + symmetry_mean + fractal_dimension_mean, data = training_data)
+mlr
+anova(mlr)
+
+mlog <- glm(diagnosis ~  texture_mean + perimeter_mean + area_mean + smoothness_mean + compactness_mean + concavity_mean + symmetry_mean + fractal_dimension_mean, data = training_data)
+mlog
+anova(mlog)
+
+```
+
+
+#Lasso Method
+
+Group Input Request: Any ideas on lambda values? s = .4 or s =500 were used in class but I think she wants us to try our own
+```{r Lasso Start Linear}
+typeof(training_data[, 4:31])
+X_training <- data.matrix(training_data[, 4:31])
+X_test     <- data.matrix(test_data[, 4:31])
+
+model_linear_lasso <- cv.glmnet(X_training, training_data$radius_mean, family="gaussian", nfolds = 10, type.measure = "mse", alpha = 1)
+summary(model_linear_lasso)
+
+
+model_linear_lasso$lambda
+
+coef(model_linear_lasso, s = 0.4)
+coef(model_linear_lasso, s = 500)
+
+as.double(coef(model_linear_lasso, s = 0.4))
+as.double(coef(model_linear_lasso, s = 500))
+
+```
+
+###Logistic
+
+Same as above will need to decide on lambda
+```{r Lasso Logistic}
+typeof(training_data[, 3:31])
+X_training <- data.matrix(training_data[, 3:31])
+X_test     <- data.matrix(test_data[, 3:31])
+
+model_logistic_lasso <- cv.glmnet(X_training, factor(training_data$diagnosis), family="binomial", nfolds= 5, type.measure="auc", alpha = 1)
+summary(model_logistic_lasso)
+
+model_logistic_lasso$lambda
+coef(model_logistic_lasso, s = 0.4)
+coef(model_logistic_lasso, s = 0.05)
+
+as.double(coef(model_logistic_lasso, s = 0.4))
+as.double(coef(model_logistic_lasso, s = 0.05))
+
+```
+
+
+
+#Updated Regression
+```{r Updated Regression}
+mlr2 <- lm(radius_mean ~ perimeter_mean + area_mean, data = training_data)
+anova(mlr2)
+
+mlog2 <- glm(diagnosis ~ concave_points_mean + radius_worst + texture_worst + concave_points_worst, data = training_data)
+anova(mlog2)
+
+```
+
+
+Cite Sources:
+
