@@ -2,21 +2,29 @@
 title: 'Week 5: Breast Cancer Variable Selection'
 author: 'Group 1: Maggie Dolan, Asheley Faris, Megan Jones, Tina Ladson, Daniel Ward'
 date: "2/16/2020"
-output: pdf_document
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+  word_document: default
 ---
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE,
+	tidy.opts=list(width.cutoff=80),tidy=TRUE
+)
 ```
 
 #Load Packages
-```{r Load Packages, message=FALSE, warning=FALSE}
+```{r Load Packages, message=FALSE, warning=FALSE, linewidth=60}
 install.packages("caret",repos = "http://cran.us.r-project.org")
 pacman::p_load(pacman,janitor,readr,gmodels,tidyr,dplyr,ggthemes,gapminder,ggplot2,factoextra,e1071,cluster,kernlab,corrplot,corrgram,hrbrthemes,viridis,glmnet,rpart,rpart.plot,partykit) 
 ```
 #Read in a data set
 
-```{r Read Data}
-#https://www.kaggle.com/uciml/breast-cancer-wisconsin-data
+```{r Read Data, message=FALSE, warning=FALSE}
 cancer <- read_csv("C:\\Users\\mjone\\OneDrive\\Desktop\\MBA 8045\\Data\\cancer.csv") # Update to your file location
 cancer <- cancer %>%
   clean_names()
@@ -64,17 +72,41 @@ summary(model_linear_lasso)
 
 model_linear_lasso$lambda
 
-coef(model_linear_lasso, s = 0.4)
-coef(model_linear_lasso, s = 500)
+coef(model_linear_lasso, s = 0.3)
+coef(model_linear_lasso, s = 50)
 
-as.double(coef(model_linear_lasso, s = 0.4))
-as.double(coef(model_linear_lasso, s = 500))
+as.double(coef(model_linear_lasso, s = 0.3))
+as.double(coef(model_linear_lasso, s = 50))
 
 ```
 
+
+Alternative: Only doing the lasso method with the _mean variables. Checking with Dr. Wang is this is a better approach. Leaving original in the case it is not. Will update ASAP. 
+
+```{r Lasso Start Linear 2}
+typeof(training_data[, 4:12])
+X_training <- data.matrix(training_data[, 4:12])
+X_test     <- data.matrix(test_data[, 4:12])
+
+model_linear_lasso2 <- cv.glmnet(X_training, training_data$radius_mean, family="gaussian", nfolds = 10, type.measure = "mse", alpha = 1)
+summary(model_linear_lasso)
+
+
+model_linear_lasso2$lambda
+
+coef(model_linear_lasso2, s = 0.3)
+coef(model_linear_lasso2, s = 50)
+
+as.double(coef(model_linear_lasso2, s = 0.3))
+as.double(coef(model_linear_lasso2, s = 50))
+
+```
+
+
+
 ###Logistic
 
-Same as above will need to decide on lambda
+
 ```{r Lasso Logistic}
 typeof(training_data[, 3:31])
 X_training <- data.matrix(training_data[, 3:31])
@@ -94,6 +126,25 @@ as.double(coef(model_logistic_lasso, s = 0.05))
 
 
 
+Alternative Logistic Lasso
+
+```{r Lasso Logistic 2}
+typeof(training_data[, 3:12])
+X_training <- data.matrix(training_data[, 3:12])
+X_test     <- data.matrix(test_data[, 3:12])
+
+model_logistic_lasso2 <- cv.glmnet(X_training, factor(training_data$diagnosis), family="binomial", nfolds= 5, type.measure="auc", alpha = 1)
+summary(model_logistic_lasso2)
+
+model_logistic_lasso2$lambda
+coef(model_logistic_lasso2, s = 0.3)
+coef(model_logistic_lasso2, s = 0.05)
+
+as.double(coef(model_logistic_lasso, s = 0.3))
+as.double(coef(model_logistic_lasso, s = 0.05))
+
+```
+
 #Updated Regression
 ```{r Updated Regression}
 mlr2 <- lm(radius_mean ~ perimeter_mean + area_mean, data = training_data)
@@ -103,7 +154,39 @@ mlog2 <- glm(diagnosis ~ concave_points_mean + radius_worst + texture_worst + co
 anova(mlog2)
 
 ```
+#Update Regression based on alternative
+Linear had the same relevant variables
+```{r Updated Alternative Regression}
+mlr2b <- lm(radius_mean ~ perimeter_mean + area_mean, data = training_data)
+anova(mlr2b)
+
+mlog2b <- glm(diagnosis ~ radius_mean + texture_mean + smoothness_mean + concave_points_mean + symmetry_mean, data = training_data)
+anova(mlog2b)
+```
 
 
-Cite Sources:
+#Prediction on Final Linear Regression
+```{r Linear Prediction}
+predict(mlr2, newdata = test_data)
+test_data$predicted_radius <- predict(mlr2, newdata = test_data)
+anova(mlr2)
+head(test_data)
+```
 
+Not providing alternate Linear as it yielded the same variables as original query. Will Clean file up after Dr. Wang reviews.
+
+#Prediction on Final Logistic Regression
+```{r Prediction Logistic Regression}
+test_data$predicted_malignant <- predict(mlog2, newdata = test_data, type = "response")#Adds to the test data frame
+anova(mlog2)
+head(test_data)
+```
+
+#Alternate Logistic
+```{r alternate Prediction Logistic Regression}
+test_data$predicted_malignant <- predict(mlog2, newdata = test_data, type = "response")#Adds to the test data frame
+anova(mlog2b)
+head(test_data)
+```
+Sources:
+https://www.kaggle.com/uciml/breast-cancer-wisconsin-data
