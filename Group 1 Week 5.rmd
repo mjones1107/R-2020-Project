@@ -17,12 +17,12 @@ knitr::opts_chunk$set(
 )
 ```
 
-#Load Packages
+# Load Packages
 ```{r Load Packages, message=FALSE, warning=FALSE, linewidth=60}
 install.packages("caret",repos = "http://cran.us.r-project.org")
 pacman::p_load(pacman,janitor,readr,gmodels,tidyr,dplyr,ggthemes,gapminder,ggplot2,factoextra,e1071,cluster,kernlab,corrplot,corrgram,hrbrthemes,viridis,glmnet,rpart,rpart.plot,partykit) 
 ```
-#Read in a data set
+# Read in a data set
 
 ```{r Read Data, message=FALSE, warning=FALSE}
 cancer <- read_csv("C:\\Users\\mjone\\OneDrive\\Desktop\\MBA 8045\\Data\\cancer.csv") # Update to your file location
@@ -32,7 +32,7 @@ str(cancer) #569 Observations
 ```
 
 
-##Prep Data For Regression 
+## Prep Data For Regression 
 In order to do regression analysis we are converting Diagnostic to Binary Column
 
 ```{r regression prep}
@@ -44,7 +44,7 @@ test_data      <- cancer[-index_training, ]#removes training observations
 
 ```
 
-##Linear and Logistic Regression
+## Linear and Logistic Regression
 
 ```{r Regression 1}
 mlr <- lm(radius_mean ~  texture_mean + perimeter_mean + area_mean + smoothness_mean + compactness_mean + concavity_mean + symmetry_mean + fractal_dimension_mean, data = training_data)
@@ -58,30 +58,7 @@ anova(mlog)
 ```
 
 
-#Lasso Method
-
-Group Input Request: Any ideas on lambda values? s = .4 or s =500 were used in class but I think she wants us to try our own
-```{r Lasso Start Linear}
-typeof(training_data[, 4:31])
-X_training <- data.matrix(training_data[, 4:31])
-X_test     <- data.matrix(test_data[, 4:31])
-
-model_linear_lasso <- cv.glmnet(X_training, training_data$radius_mean, family="gaussian", nfolds = 10, type.measure = "mse", alpha = 1)
-summary(model_linear_lasso)
-
-
-model_linear_lasso$lambda
-
-coef(model_linear_lasso, s = 0.3)
-coef(model_linear_lasso, s = 50)
-
-as.double(coef(model_linear_lasso, s = 0.3))
-as.double(coef(model_linear_lasso, s = 50))
-
-```
-
-
-Alternative: Only doing the lasso method with the _mean variables. Checking with Dr. Wang is this is a better approach. Leaving original in the case it is not. Will update ASAP. 
+# Lasso Method
 
 ```{r Lasso Start Linear 2}
 typeof(training_data[, 4:12])
@@ -89,7 +66,7 @@ X_training <- data.matrix(training_data[, 4:12])
 X_test     <- data.matrix(test_data[, 4:12])
 
 model_linear_lasso2 <- cv.glmnet(X_training, training_data$radius_mean, family="gaussian", nfolds = 10, type.measure = "mse", alpha = 1)
-summary(model_linear_lasso)
+summary(model_linear_lasso2)
 
 
 model_linear_lasso2$lambda
@@ -104,31 +81,11 @@ as.double(coef(model_linear_lasso2, s = 50))
 
 
 
-###Logistic
+### Logistic Lasso Method
+
 
 
 ```{r Lasso Logistic}
-typeof(training_data[, 3:31])
-X_training <- data.matrix(training_data[, 3:31])
-X_test     <- data.matrix(test_data[, 3:31])
-
-model_logistic_lasso <- cv.glmnet(X_training, factor(training_data$diagnosis), family="binomial", nfolds= 5, type.measure="auc", alpha = 1)
-summary(model_logistic_lasso)
-
-model_logistic_lasso$lambda
-coef(model_logistic_lasso, s = 0.4)
-coef(model_logistic_lasso, s = 0.05)
-
-as.double(coef(model_logistic_lasso, s = 0.4))
-as.double(coef(model_logistic_lasso, s = 0.05))
-
-```
-
-
-
-Alternative Logistic Lasso
-
-```{r Lasso Logistic 2}
 typeof(training_data[, 3:12])
 X_training <- data.matrix(training_data[, 3:12])
 X_test     <- data.matrix(test_data[, 3:12])
@@ -140,23 +97,14 @@ model_logistic_lasso2$lambda
 coef(model_logistic_lasso2, s = 0.3)
 coef(model_logistic_lasso2, s = 0.05)
 
-as.double(coef(model_logistic_lasso, s = 0.3))
-as.double(coef(model_logistic_lasso, s = 0.05))
+as.double(coef(model_logistic_lasso2, s = 0.3))
+as.double(coef(model_logistic_lasso2, s = 0.05))
 
 ```
 
-#Updated Regression
+# Updated Regression
+
 ```{r Updated Regression}
-mlr2 <- lm(radius_mean ~ perimeter_mean + area_mean, data = training_data)
-anova(mlr2)
-
-mlog2 <- glm(diagnosis ~ concave_points_mean + radius_worst + texture_worst + concave_points_worst, data = training_data)
-anova(mlog2)
-
-```
-#Update Regression based on alternative
-Linear had the same relevant variables
-```{r Updated Alternative Regression}
 mlr2b <- lm(radius_mean ~ perimeter_mean + area_mean, data = training_data)
 anova(mlr2b)
 
@@ -165,28 +113,21 @@ anova(mlog2b)
 ```
 
 
-#Prediction on Final Linear Regression
+# Prediction on Final Linear Regression
 ```{r Linear Prediction}
-predict(mlr2, newdata = test_data)
-test_data$predicted_radius <- predict(mlr2, newdata = test_data)
-anova(mlr2)
+predict(mlr2b, newdata = test_data)
+test_data$predicted_radius <- predict(mlr2b, newdata = test_data)
+anova(mlr2b)
 head(test_data)
 ```
 
-Not providing alternate Linear as it yielded the same variables as original query. Will Clean file up after Dr. Wang reviews.
 
-#Prediction on Final Logistic Regression
-```{r Prediction Logistic Regression}
-test_data$predicted_malignant <- predict(mlog2, newdata = test_data, type = "response")#Adds to the test data frame
-anova(mlog2)
-head(test_data)
-```
-
-#Alternate Logistic
+# Prediction on Final Logistic Regression
 ```{r alternate Prediction Logistic Regression}
-test_data$predicted_malignant <- predict(mlog2, newdata = test_data, type = "response")#Adds to the test data frame
+test_data$predicted_malignant <- predict(mlog2b, newdata = test_data, type = "response")#Adds to the test data frame
 anova(mlog2b)
 head(test_data)
 ```
+
 Sources:
 https://www.kaggle.com/uciml/breast-cancer-wisconsin-data
