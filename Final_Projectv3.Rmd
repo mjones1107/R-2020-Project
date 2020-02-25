@@ -1,0 +1,401 @@
+---
+title: "Final Project: Economic Freedom of the World"
+author: "Group1"
+date: "2/16/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Install Packages, message=FALSE, warning=FALSE}
+install.packages("caret",repos = "http://cran.us.r-project.org")
+pacman::p_load(pacman,janitor,readr,gmodels,tidyr,dplyr,ggthemes,gapminder,plotly,cowplot,tmap,ggplot2,RColorBrewer,gganimate,gifski,sf,factoextra,e1071,cluster,kernlab,corrplot,corrgram,hrbrthemes,viridis,glmnet,rpart,rpart.plot,partykit,maps,tmap,ggmap,htmltools,animation) 
+
+```
+## Introduction
+For our final project we will be reviewing Economic Freedom across the worls. With data ranging from 1970-2016.
+
+Topics Covered:
+
+  * Exploratory Analysis (Summaries and Filtered Data Frames)
+  
+  * Exploratory Plots
+  
+  * Linear Regression
+  
+  * Variable Selection: Lasso Method
+  
+  * Clustering
+
+
+
+#### We start by reading in and cleaning the data. In total we have 3726 observations 
+
+```{r Read In Data, message=FALSE, warning=FALSE}
+freedom <- read_csv("C:\\Users\\mjone\\OneDrive\\Desktop\\MBA 8045\\Data\\efw_cc.csv") # Update to your file location
+freedom <- freedom %>%
+  clean_names()
+
+```
+
+
+Now that we have access to all of our data we will take a look at it to see which variables we have access to
+```{r Exploratory Analysis}
+str(freedom)#3726 Observations
+summary(freedom)
+```
+# Variable Description:
+### Area 1: 
+  * Size of Government—As government spending,
+taxation, and the size of government-controlled enterprises
+increase, government decision-making is substituted for
+individual choice and economic freedom is reduced.
+
+### Area 2: 
+  * Legal System and Property Rights—Protection of
+persons and their rightfully acquired property is a central
+element of both economic freedom and civil society.
+Indeed, it is the most important function of government.
+
+### Area 3: 
+  * Sound Money—Inflation erodes the value of rightfully earned wages and savings. Sound money is thus essential to protect property rights. When inflation is not only high
+but also volatile, it becomes difficult for individuals to plan
+for the future and thus use economic freedom effectively.
+
+### Area 4: 
+  * Freedom to Trade Internationally—Freedom to
+exchange—in its broadest sense, buying, selling, making
+contracts, and so on—is essential to economic freedom,
+which is reduced when freedom to exchange does not
+include businesses and individuals in other nations.
+
+### Area 5: 
+  * Regulation—Governments not only use a number
+of tools to limit the right to exchange internationally, they
+may also develop onerous regulations that limit the right to
+exchange, gain credit, hire or work for whom you wish, or
+freely operate your business. 
+
+
+### Creating Data Frame for 2016
+Next we will create a data frame for 2016 our most recent year. From there we will do some plotting to get a better view of what has occured over time. 
+```{r Creating 2016 Data Frame}
+freedom2016 <- filter(freedom, year == "2016") #Filtering to 2016 most recent year in data
+freedom2016 <- freedom2016[order(freedom2016$rank),]#Sorting data frame from lowest to highest
+head(freedom2016)
+summary(freedom2016)
+
+```
+
+```{r Highest/Lowest Performers}
+lowfreedom <- filter(freedom2016, min_rank(freedom2016$rank) < 6)
+print(lowfreedom)
+
+highfreedom <- filter(freedom2016, min_rank(freedom2016$rank) > 116)
+print(highfreedom)
+
+```
+
+
+##### Variable Relationship
+Corrgram
+
+```{r Corrgram}
+corrgram(freedom, order=TRUE, lower.panel=panel.shade,
+         upper.panel=panel.cor, text.panel=panel.txt,
+         main="Economic Freedom")
+
+```
+
+
+### Visualize our Data
+
+The below chart has each country in our data set and their score over time 1-10. We can see from our plots that some countries were not established in certain periods. This means we will have to deal with NA values in our analysis. Keep this in mind. 
+
+
+```{r All Country Scatter Plot, fig.height=7, fig.width=5}
+
+#Plot Below Covers All Countries and Year to get a view of changes
+freedom %>% filter(!is.na(economic_freedom) | !is.na(year)) %>% group_by(year) %>%
+  ggplot(aes(year,economic_freedom, fill = economic_freedom, group = 1))+
+  geom_line(aes(color = economic_freedom))+
+  scale_color_viridis(option = "plasma",direction = -1, discrete=FALSE) +
+  facet_wrap(~countries)+theme_bw()+
+  theme(legend.position = "none", axis.text.x = element_blank(), 
+        strip.text.x = element_text(size = 6))+
+  xlab(" ") + ylab("")+ ggtitle("ECONOMIC FREEDOM OF THE WORLD 1970-2016")
+
+```
+
+
+### Scatter Plots
+
+The next three plots show the relation of x (Trade, Sound Money, and Regulations) to economic freedom. The size of the bubble represents the rank. Larger bubbles indicates a higher rank. 
+
+##### Please note a separate file will be send for the video
+
+```{r Plotly Scatter Plot, message=FALSE, warning=FALSE}
+#Yearly Scatter Plot for US, Potentially other countries
+p <- ggplot(freedom, aes(x4_trade, economic_freedom, color = countries)) +
+  geom_point(aes(size = -rank, frame = year, ids = countries)) +
+  scale_x_log10()
+p <- ggplotly(p)
+p
+
+
+p4 <- ggplot(freedom, aes(x3_sound_money, economic_freedom, color = countries)) +
+  geom_point(aes(size = -rank, frame = year, ids = countries)) +
+  scale_x_log10()
+p4 <- ggplotly(p4)
+p4
+
+p5 <- ggplot(freedom, aes(x5c_business_reg, economic_freedom, color = countries)) +
+  geom_point(aes(size = -rank, frame = year, ids = countries)) +
+  scale_x_log10()
+p5 <- ggplotly(p5)
+p5
+```
+
+
+
+## Selected Countries Plot
+After reviewing our initial line graphs we selected a few countries to show 6 countries trends. Our x-axis is time and y-axis is Economic Freedom
+
+```{r plot for selected countries, message=FALSE, warning=FALSE}
+# Keep only 3 names
+country <- filter(freedom,countries %in% c("United States", "China", "Venezuela", "United Kingdom", "Ghana","Zimbabwe"))
+ 
+# Plot
+country %>%
+  ggplot( aes(x=year, y=economic_freedom, group=countries, color=countries)) +
+    geom_line() +
+    geom_point() +
+    scale_color_viridis(discrete = TRUE) +
+    ggtitle("Countries Performance Over Time") +
+    theme_ipsum() +
+    ylab("Economic Freedom") +
+    transition_reveal(year)
+
+# Save at gif:
+anim_save("Economic Freedom by Year.gif")
+
+```
+
+
+Economic Freedom Bubble Plot
+Here we can see the distribution of our 
+
+##
+```{r Static Bubble Plot}
+#static 2016 Bubble Plot
+a1 <- ggplotly(ggplot(freedom2016, aes(quartile,economic_freedom , size = -rank)) + 
+                 geom_jitter(aes(color=countries, alpha=0.5)) +
+                 theme_bw()+ theme(legend.position= "none")+
+                 xlab("Quartile") + 
+                 ggtitle("Economic Freedom Index 2016"), tooltip = c("countries"))
+a1
+
+#static 2016 Scatter Plot
+b1 <- ggplotly(ggplot(freedom2016, aes(quartile,economic_freedom)) + 
+                 geom_jitter(aes(color=countries, alpha=0.5)) +
+                 theme_bw()+ theme(legend.position= "none")+
+                 xlab("Quartile") + 
+                 ggtitle("Economic Freedom Index 2016"), tooltip = c("countries"))
+b1
+
+```
+
+
+
+## 2016 Maps (Rank and Trade)
+From both of these visualizations we can see that trade and economic_freedom are visually similar to rank. The differences do indicate the other variables should be considered when trying to increase the rank profile of a country.
+
+``` {r 2016 Maps}
+jBrewColors <- brewer.pal(n = 8, name = "BuPu")
+
+
+p1 <- plot_geo(freedom2016) %>%
+  add_trace(z = ~-rank, color = ~-rank,colors = jBrewColors,
+            text = ~freedom2016$countries, locations = ~freedom2016$iso_code) %>%
+  colorbar(title = 'Countries' , tickprefix = 'Rank') %>%
+  layout(title = 'Economic Freedom 2016 by Rank') 
+
+p1
+
+p2 <- plot_geo(freedom2016) %>%
+  add_trace(z = ~x5c_business_reg, color = ~x5c_business_reg,colors = jBrewColors,
+            text = ~freedom2016$countries, locations = ~freedom2016$iso_code) %>%
+  colorbar(title = 'Countries' , tickprefix = 'Trade') %>%
+  layout(title = 'Economic Freedom 2016 by Trade') 
+
+p2
+
+p8 <- plot_geo(freedom2016) %>%
+  add_trace(z = ~economic_freedom, color = ~-rank,colors = jBrewColors,
+            text = ~freedom2016$countries, locations = ~freedom2016$iso_code) %>%
+  colorbar(title = 'Countries' , tickprefix = 'Rank') %>%
+  layout(title = 'Economic Freedom 2016 by Rank') 
+
+p8
+
+```
+
+
+## Assigning Clusters For 2016 
+```{r 2016 Cluster}
+fviz_nbclust(na.omit(freedom2016[4:36]), kmeans, method = "silhouette")
+gap_stat <- clusGap(na.omit(freedom2016[4:36]), FUN = kmeans, nstart = 25,
+                    K.max = 10, B = 50)
+fviz_gap_stat(gap_stat)
+
+n_cluster <- 4
+
+results  <- kmeans(na.omit(freedom2016[4:36]),n_cluster)
+results
+
+freedom2016 <- na.omit(freedom2016)
+freedom2016$cluster_number <- results$cluster
+```
+
+## Assigning Clusters for All Years 
+```{r Cluster}
+fviz_nbclust(na.omit(freedom[4:36]), kmeans, method = "silhouette")
+gap_stat <- clusGap(na.omit(freedom[4:36]), FUN = kmeans, nstart = 25,
+                    K.max = 10, B = 50)
+fviz_gap_stat(gap_stat)
+
+n_cluster <- 4
+
+results2  <- kmeans(na.omit(freedom[4:36]),n_cluster)
+results2
+
+freedom <- na.omit(freedom)
+freedom$cluster_number <- results2$cluster
+```
+
+# Cluster Boxplot for All Years
+
+```{r Cluster Regression Analysis}
+
+boxplot(freedom$economic_freedom ~ freedom$cluster_number,col=terrain.colors(4),
+        xlab='Cluster', ylab='Economic Freedom',
+        main='Economic Freedom by Cluster')
+
+boxplot(freedom$rank ~ freedom$cluster_number,col=terrain.colors(4),
+        xlab='Cluster', ylab='Rank',
+        main='Rank by Cluster')
+
+```
+
+# Cluster Plots 2016
+
+```{r 2016 Cluster Plot, message=FALSE, warning=FALSE}
+
+fviz_cluster(results, data = na.omit(freedom2016[4:36]))
+
+jBrewColors2 <- brewer.pal(n = 8, name = "Spectral")
+p3 <- plot_geo(freedom2016) %>%
+  add_trace(z = ~cluster_number, color = ~cluster_number,colors = jBrewColors2,
+            text = ~freedom2016$countries, locations = ~freedom2016$iso_code) %>%
+  colorbar(title = 'Countries' , tickprefix = 'Clusters') %>%
+  layout(title = 'Economic Freedom 2016 by Cluster') 
+
+p3
+
+```
+
+
+
+
+# Regression
+
+Now we get into the meat of our analysis. We start be prepping our data for regression. Gathering some test and training data
+
+```{r Regression}
+str(freedom)
+freedom$high_ef <- ifelse(freedom$economic_freedom > 6, 1, 0) # Converting economic freedom to binary data 
+freedom <- na.omit(freedom)
+index_training <- sample(dim(freedom)[1], 40, replace = FALSE) # replace = false will prevent code from selecting same observation twice
+training_data  <- freedom[index_training, ]
+test_data      <- freedom[-index_training, ]
+
+```
+
+
+Since we dont want to randomly select variables to use we will use the Lasso Method for variable selection
+
+```{r Lasso Method}
+typeof(training_data[, 7:36])
+X_training <- data.matrix(training_data[, 7:36])
+X_test     <- data.matrix(test_data[, 7:36])
+
+model_linear_lasso <- cv.glmnet(X_training, training_data$economic_freedom, family="gaussian", nfolds = 10, type.measure = "mse", alpha = 1)
+summary(model_linear_lasso)
+
+
+model_linear_lasso$lambda
+
+coef(model_linear_lasso, s = 0.4)
+coef(model_linear_lasso, s = 500)
+
+as.double(coef(model_linear_lasso, s = 0.4))
+as.double(coef(model_linear_lasso, s = 500))
+
+#After Lasso Linear Regression
+mlr2 <- lm(economic_freedom ~ x3_sound_money + x4_trade + x5c_business_reg, data = training_data)
+anova(mlr2)
+summary(mlr2)
+```
+
+
+Now that we have our predicted values for our model we want to check how our work.
+
+```{r Testing Prediction}
+
+prediction_result_after_linear_lasso <- predict(mlr2, newdata = test_data, se.fit = TRUE)
+
+mean(prediction_result_after_linear_lasso$se.fit)
+
+```
+
+
+Finally we plot our linear regression with the variables selected from the variable selection
+
+```{r Final Regression Plot}
+plot_grid(ggplot(freedom, aes(x3_sound_money, economic_freedom)) + 
+            geom_point(color='#50C878', alpha = 0.5)+
+            xlab("Sound Money") + ylab("Economic Freedom ")+
+            geom_smooth(method = lm)+theme_bw(),
+          ggplot(freedom, aes(x4_trade, economic_freedom)) + 
+            geom_point(color='#50C878', alpha = 0.5)+
+            xlab("Trade") + ylab("")+
+            geom_smooth(method = lm)+theme_bw(),
+          ggplot(freedom, aes(x5c_business_reg, economic_freedom)) + 
+            geom_point(color='#50C878', alpha = 0.5)+
+            xlab("Business_Regulations") + ylab("")+
+            geom_smooth(method = lm)+theme_bw(),align = 'h')
+```
+
+
+# Conclusion/ Key Takeaways
+Note to Group: We can certainly change these as everyone becomes familiar with the data and forms their own takeaways
+
+Dealing with a long time frame created the challenge of dealing with null values. 
+
+Cluster 2 had the key attributes of countries that ranked the highests.
+
+Since the aspects of Economic Freedom have been broken down into measurable variables we were able to build sound models
+
+Our models proved to be significant in predicting economic freedom. If government officials want to improve the lives of their citizens through economic freedom they should focus on:
+  * Having sound money
+  * Free Trade
+  * Business Regulation
+
+## Thank you for working with us this semester!
+
+Sources:
+https://www.kaggle.com/gsutters/economic-freedom
+
+https://www.fraserinstitute.org/sites/default/files/economic-freedom-of-the-world-2018-execsummary.pdf
